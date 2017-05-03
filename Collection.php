@@ -13,7 +13,6 @@ class Collection implements IteratorAggregate, ArrayAccess {
      *
      * @param string $path
      * @param mixed $value
-     * @return array
      */
     public function set($path, $value) {
         if ($path == NULL) {
@@ -23,12 +22,28 @@ class Collection implements IteratorAggregate, ArrayAccess {
         }
     }
 
-    private function _set(&$array, $path, $value) {
+    /**
+     * Push $value in $array where $key is the recursive Path inside $array
+     * if the key has element just add the new value 
+     *
+     * @param string $path
+     * @param mixed $value
+     */
+    public function push($path, $value) {
+        if ($path == NULL) {
+            $this->items = $value;
+        } else {
+            $this->_set( $this->items, $path, $value, true);
+        }
+    }
+
+    private function _set(&$array, $path, $value, $push = false) {
         if (!$this->isAcceptedArrayType($array)) {
             $array = array();
         }
 
         $parts = explode('.', $path);
+
 
         if (count($parts) > 1) {
             $part = array_shift($parts);
@@ -43,13 +58,24 @@ class Collection implements IteratorAggregate, ArrayAccess {
             
             $array[$part] = $this->_set($array[$part], join('.', $parts), $value);
         } else {
-            $array[$path] = $value;
+            // if $push true dont remove the old value
+            if (isset($array[$path]) && $push == true)
+                // if the old value is array just push the new value to it
+                // if not so add the new value and the old as array
+                if (is_array($array[$path]))
+                    array_push($array[$path], $value);
+                else 
+                    $array[$path] = [$array[$path], $value];
+            else 
+                // if $push is false just puth the new value in stat of the old
+                $array[$path] = $value;
         }
         
         return $array;
     }
 
     /**
+     * get the value in the $path
      * @param string $path
      * @param mixed $default
      * @return mixed
@@ -65,15 +91,26 @@ class Collection implements IteratorAggregate, ArrayAccess {
 
         /*
           return $this->getValue(
-          explode('.', $key),
+          explode('.', $path),
           $this->items,
           $default
           );
          */
     }
 
-    /*
-    private function getValue(array &$indexs, array $value, $default = NULL) {
+    /**
+     * get the value in the $path and remove it from the array
+     * @param string $path
+     * @param mixed $default
+     * @return mixed
+     */
+    public function pop($path, $default = NULL) {
+        $value = $this->get($path, $default);
+        $this->clear($path);
+        return $value;
+    }
+
+    private function &getValue(array $indexs, array $value, $default = NULL) {
         $key = array_shift($indexs);
         if (empty($indexs)) {
             if (!array_key_exists($key, $value)) {
@@ -81,7 +118,7 @@ class Collection implements IteratorAggregate, ArrayAccess {
             }
 
             if (is_array($value[$key])) {
-                return new Collection($value[$key]);
+                return $value[$key];
             } else {
                 return $value[$key];
             }
@@ -89,8 +126,7 @@ class Collection implements IteratorAggregate, ArrayAccess {
             return $this->getValue($indexs, $value[$key], $default);
         }
     }
-     */
-    
+     
     
     /**
      * Determines if $path exists in $array
@@ -114,6 +150,10 @@ class Collection implements IteratorAggregate, ArrayAccess {
         } else {
             return $this->_has($keys, $value[$key]);
         }
+    }
+
+    public function toArray() {
+        return $this->items;
     }
 
     /**
@@ -195,6 +235,12 @@ class Collection implements IteratorAggregate, ArrayAccess {
         }
     }
     
+    //=============================================
+    //=============================================
+    /**
+    * implements IteratorAggregate, ArrayAccess
+    * to use the object as array
+    */
     public function offsetExists($offset) {
         $this->has($key);
     }
